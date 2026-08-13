@@ -5,8 +5,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface CryptoQuote {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  marketCap: number;
+  image?: string;
+}
+
+interface CoinGeckoMarket {
+  id: string;
+  symbol: string;
+  name: string;
+  current_price: number | null;
+  price_change_24h: number | null;
+  price_change_percentage_24h: number | null;
+  total_volume: number | null;
+  market_cap: number | null;
+  image?: string;
+}
+
 // Cache for crypto prices (2 min TTL)
-const cache = new Map<string, { data: any; timestamp: number }>();
+const cache = new Map<string, { data: CryptoQuote[]; timestamp: number }>();
 const CACHE_TTL = 2 * 60 * 1000;
 
 // Top 50 crypto IDs for CoinGecko
@@ -62,7 +85,6 @@ serve(async (req) => {
   }
 
   try {
-    // Check cache
     const cached = cache.get('all-cryptos');
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       console.log('Returning cached crypto data');
@@ -72,10 +94,9 @@ serve(async (req) => {
       );
     }
 
-    // Fetch from CoinGecko API (free, no key required)
     const idsParam = CRYPTO_IDS.join(',');
     const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${idsParam}&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`;
-    
+
     console.log('Fetching crypto prices from CoinGecko');
     const response = await fetch(url, {
       headers: {
@@ -92,28 +113,26 @@ serve(async (req) => {
       );
     }
 
-    const data = await response.json();
-    
-    const cryptos = data.map((coin: any) => ({
+    const data = (await response.json()) as CoinGeckoMarket[];
+
+    const cryptos: CryptoQuote[] = data.map((coin) => ({
       symbol: ID_TO_SYMBOL[coin.id] || coin.symbol.toUpperCase(),
       name: ID_TO_NAME[coin.id] || coin.name,
-      price: coin.current_price || 0,
-      change: coin.price_change_24h || 0,
-      changePercent: coin.price_change_percentage_24h || 0,
-      volume: coin.total_volume || 0,
-      marketCap: coin.market_cap || 0,
+      price: coin.current_price ?? 0,
+      change: coin.price_change_24h ?? 0,
+      changePercent: coin.price_change_percentage_24h ?? 0,
+      volume: coin.total_volume ?? 0,
+      marketCap: coin.market_cap ?? 0,
       image: coin.image,
     }));
 
-    // Cache the result
     cache.set('all-cryptos', { data: cryptos, timestamp: Date.now() });
 
     return new Response(
       JSON.stringify({ cryptos }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in crypto-prices function:', error);
     const fallback = generateFallbackPrices();
     return new Response(
@@ -123,7 +142,7 @@ serve(async (req) => {
   }
 });
 
-function generateFallbackPrices() {
+function generateFallbackPrices(): CryptoQuote[] {
   const basePrices: Record<string, number> = {
     'BTC': 67500, 'ETH': 3450, 'USDT': 1, 'BNB': 605, 'SOL': 175,
     'XRP': 0.52, 'USDC': 1, 'STETH': 3440, 'ADA': 0.45, 'DOGE': 0.12,
