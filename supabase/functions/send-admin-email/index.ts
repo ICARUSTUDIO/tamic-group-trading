@@ -19,21 +19,33 @@ interface EmailRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase service configuration is missing');
+    }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { type, userId, userEmail, userName, amount, method, cryptoType, walletAddress, details }: EmailRequest = await req.json();
+    const {
+      type,
+      userId,
+      userEmail,
+      userName,
+      amount,
+      method,
+      cryptoType,
+      walletAddress,
+      details,
+    } = (await req.json()) as EmailRequest;
 
-    // Get admin notification email from settings
     const { data: emailSetting } = await supabase
       .from('admin_settings')
       .select('setting_value')
@@ -42,21 +54,19 @@ const handler = async (req: Request): Promise<Response> => {
 
     const adminEmail = emailSetting?.setting_value || 'admin@tamicgroup.com';
 
-    // Get user details if not provided
     let email = userEmail;
     let name = userName;
     if (!email || !name) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('email, full_name, wallet_id')
+        .select('email, full_name')
         .eq('id', userId)
         .maybeSingle();
-      
+
       email = profile?.email || 'Unknown';
       name = profile?.full_name || profile?.email || 'Unknown User';
     }
 
-    // Build email content based on type
     let subject = '';
     let htmlContent = '';
 
@@ -89,7 +99,7 @@ const handler = async (req: Request): Promise<Response> => {
         break;
 
       case 'kyc':
-        subject = `📋 New KYC Submission`;
+        subject = '📋 New KYC Submission';
         htmlContent = `
           <h1>New KYC Application</h1>
           <p><strong>User:</strong> ${name} (${email})</p>
@@ -114,7 +124,7 @@ const handler = async (req: Request): Promise<Response> => {
         break;
 
       default:
-        subject = `🔔 TamicGroups Alert`;
+        subject = '🔔 TamicGroups Alert';
         htmlContent = `
           <h1>Admin Alert</h1>
           <p><strong>User:</strong> ${name} (${email})</p>
@@ -123,7 +133,6 @@ const handler = async (req: Request): Promise<Response> => {
         `;
     }
 
-    // If RESEND_API_KEY is available, send email
     if (resendApiKey) {
       const emailResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -142,7 +151,6 @@ const handler = async (req: Request): Promise<Response> => {
       if (!emailResponse.ok) {
         const errorData = await emailResponse.text();
         console.error('Resend API error:', errorData);
-        // Don't throw - we'll still return success so the main flow continues
       } else {
         console.log('Email sent successfully to:', adminEmail);
       }
@@ -159,10 +167,11 @@ const handler = async (req: Request): Promise<Response> => {
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in send-admin-email function:", error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
