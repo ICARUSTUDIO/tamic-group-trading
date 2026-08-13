@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, Clock, XCircle, FileText, User, Building2 } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, FileText, User, Building2, type LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,14 @@ import { CorporateKYCForm } from '@/components/kyc/CorporateKYCForm';
 import { useKYC, KYCStatus } from '@/hooks/useKYC';
 import { cn } from '@/lib/utils';
 
-const statusConfig: Record<KYCStatus, { icon: any; label: string; color: string; description: string }> = {
+interface KYCStatusConfig {
+  icon: LucideIcon;
+  label: string;
+  color: string;
+  description: string;
+}
+
+const statusConfig: Record<KYCStatus, KYCStatusConfig> = {
   not_started: {
     icon: FileText,
     label: 'Not Started',

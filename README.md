@@ -1,30 +1,51 @@
 # Tamic Group Trading Platform
 
-A full-stack portfolio, wallet, and investment-management platform built for Tamic Group. The application combines a customer trading experience with administrative tools for KYC review, withdrawals, account management, and financial controls.
+A full-stack portfolio, wallet, and investment-management application built with React, TypeScript, and Supabase. It combines customer-facing financial workflows with administrative tools for KYC review, withdrawals, account management, and access control.
 
-## Highlights
+> **Portfolio project:** This repository demonstrates software-engineering decisions and product workflows. It is not a regulated brokerage, exchange, bank, or production financial service.
 
-### Customer experience
+## What the application covers
+
+### Customer workflows
 
 - Account registration and Supabase authentication
-- TAMG share-purchase workflow
-- Portfolio holdings, average price, and asset-value tracking
+- TAMG share-purchase flow
+- Portfolio holdings, average-price, and asset-value tracking
 - Fiat and cryptocurrency wallet views
 - Internal transfers between platform balances
-- Bank and crypto deposit/withdrawal workflows
+- Bank and crypto deposit/withdrawal requests
 - Transaction history
 - Individual and corporate KYC submission
 - Responsive dashboards and forms
 
-### Administrative experience
+### Administrative workflows
 
 - Platform metrics dashboard
 - User and profile management
 - Role and permission controls
-- Manual balance adjustments
 - KYC document review with approve/reject decisions
 - Pending and historical withdrawal queues
 - Bank and cryptocurrency withdrawal review
+- Controlled balance-adjustment interfaces
+
+## Architecture
+
+The frontend is organised around route-level pages, reusable UI components, domain-specific hooks, and a Supabase integration layer.
+
+```text
+src/
+├── components/      Reusable UI and domain components
+├── hooks/           Shared state and data-access hooks
+├── integrations/    Supabase client and generated types
+├── lib/             Cross-cutting utilities
+└── pages/           Route-level application workflows
+
+supabase/
+├── functions/       Trusted server-side operations
+└── migrations/      Database schema and policy history
+```
+
+The browser uses a Supabase publishable key. Authentication alone is not authorisation: Row Level Security policies, storage policies, database functions, and Edge Functions must enforce sensitive operations.
 
 ## Technology
 
@@ -35,13 +56,13 @@ A full-stack portfolio, wallet, and investment-management platform built for Tam
 - TanStack Query
 - React Hook Form and Zod
 - Recharts
-- Node.js or Bun
 
 ## Local setup
 
 ### Prerequisites
 
-- Node.js 18+ or Bun
+- Node.js 18 or later
+- npm
 - A Supabase project
 
 ### Installation
@@ -49,10 +70,10 @@ A full-stack portfolio, wallet, and investment-management platform built for Tam
 ```bash
 git clone https://github.com/ICARUSTUDIO/tamic-group-trading.git
 cd tamic-group-trading
-npm install
+npm ci
 ```
 
-Create a local `.env` file using `.env.example` as a reference:
+Create a local `.env` file from `.env.example`:
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -65,35 +86,34 @@ Start the development server:
 npm run dev
 ```
 
-Build and preview the production bundle:
+## Engineering checks
+
+Run the complete local validation pipeline:
 
 ```bash
-npm run build
-npm run preview
+npm run check
 ```
 
-## Core data areas
+This executes:
 
-The project uses Supabase tables and storage for areas such as:
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
 
-- User profiles and roles
-- Portfolio holdings
-- Wallet and balance information
-- Transactions and internal transfers
-- Withdrawal requests
-- KYC submissions and supporting documents
+The same checks run automatically in GitHub Actions for pull requests and changes to `main`.
 
-## Security model
+## Security boundaries
 
-The browser uses a Supabase publishable key. That key is designed for client applications and is not a substitute for authorisation. Row Level Security policies, storage policies, database functions, and Edge Functions must enforce every sensitive operation.
+- Never expose a Supabase service-role key in frontend code or commit it to the repository.
+- Privileged balance changes, approvals, and financial controls must run through trusted server-side logic.
+- Database and storage access must be restricted by reviewed Row Level Security and storage policies.
+- Production financial systems additionally require immutable audit logs, reconciliation, idempotency, rate limiting, fraud controls, regulatory review, and independent security assessment.
 
-Never expose a Supabase service-role key in frontend code or commit it to the repository. Administrative balance changes, approvals, and other privileged financial actions should be performed only through trusted server-side logic with audited authorisation.
+## Current limitations
 
-## Project status
-
-This is a portfolio and product-development project demonstrating authenticated dashboards, financial workflows, role-based interfaces, form validation, cloud persistence, and administrative tooling. It is not a regulated brokerage, exchange, bank, or production financial service.
-
-Before production use, add independent security review, comprehensive automated testing, immutable audit logs, formal reconciliation, idempotent transaction processing, rate limiting, fraud controls, regulatory review, and hardened server-side enforcement.
+This project demonstrates authenticated dashboards, role-based workflows, form validation, cloud persistence, and administrative tooling. Before production use, it still requires comprehensive automated tests, hardened server-side enforcement, observability, formal audit trails, and a dedicated security review.
 
 ## License
 
