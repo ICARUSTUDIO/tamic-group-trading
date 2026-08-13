@@ -11,6 +11,16 @@ export interface Stock {
   category: string;
 }
 
+interface StockApiQuote {
+  symbol: string;
+  name?: string;
+  price?: number;
+  change?: number;
+  changePercent?: number;
+  volume?: number;
+  category?: string;
+}
+
 // Extended list of popular US stocks
 const US_STOCKS = [
   { symbol: 'AAPL', name: 'Apple Inc.', category: 'Technology' },
@@ -48,22 +58,23 @@ export function useStocks() {
   const fetchStocks = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const { data, error: fnError } = await supabase.functions.invoke('stock-prices', {
-        body: { symbols: US_STOCKS.map(s => s.symbol) }
+        body: { symbols: US_STOCKS.map((stock) => stock.symbol) },
       });
-      
+
       if (fnError) throw fnError;
-      
-      if (data?.stocks) {
-        const stocksWithDetails = data.stocks.map((stock: any) => {
-          const stockInfo = US_STOCKS.find(s => s.symbol === stock.symbol);
-          return {
-            ...stock,
-            name: stockInfo?.name || stock.symbol,
-            category: stockInfo?.category || 'Other'
-          };
+
+      const responseStocks = Array.isArray(data?.stocks) ? (data.stocks as StockApiQuote[]) : [];
+      if (responseStocks.length > 0) {
+        const stocksWithDetails = responseStocks.map((stock) => {
+          const stockInfo = US_STOCKS.find((item) => item.symbol === stock.symbol);
+          return normaliseStock(
+            stock,
+            stockInfo?.name ?? stock.name ?? stock.symbol,
+            stockInfo?.category ?? stock.category ?? 'Other',
+          );
         });
         setStocks(stocksWithDetails);
       }
@@ -79,36 +90,49 @@ export function useStocks() {
   // Search any stock by symbol
   const searchStock = useCallback(async (symbol: string): Promise<Stock | null> => {
     try {
+      const normalisedSymbol = symbol.trim().toUpperCase();
       const { data, error: fnError } = await supabase.functions.invoke('stock-prices', {
-        body: { symbols: [symbol.toUpperCase()], search: true }
+        body: { symbols: [normalisedSymbol], search: true },
       });
-      
-      if (fnError || !data?.stocks?.length) return null;
-      
-      const stockData = data.stocks[0];
-      return {
-        ...stockData,
-        name: stockData.name || symbol.toUpperCase(),
-        category: 'Other'
-      };
+
+      if (fnError || !Array.isArray(data?.stocks) || data.stocks.length === 0) return null;
+
+      const stockData = data.stocks[0] as StockApiQuote;
+      return normaliseStock(
+        stockData,
+        stockData.name ?? normalisedSymbol,
+        stockData.category ?? 'Other',
+      );
     } catch {
       return null;
     }
   }, []);
 
   const getStock = useCallback((symbol: string) => {
-    return stocks.find(s => s.symbol === symbol);
+    return stocks.find((stock) => stock.symbol === symbol);
   }, [stocks]);
 
   return { stocks, loading, error, fetchStocks, searchStock, getStock };
 }
 
+function normaliseStock(quote: StockApiQuote, name: string, category: string): Stock {
+  return {
+    symbol: quote.symbol,
+    name,
+    price: Number(quote.price ?? 0),
+    change: Number(quote.change ?? 0),
+    changePercent: Number(quote.changePercent ?? 0),
+    volume: Number(quote.volume ?? 0),
+    category,
+  };
+}
+
 function generateSimulatedStocks(): Stock[] {
-  return US_STOCKS.map(stock => {
+  return US_STOCKS.map((stock) => {
     const basePrice = getBasePrice(stock.symbol);
     const change = (Math.random() - 0.5) * basePrice * 0.05;
     const changePercent = (change / basePrice) * 100;
-    
+
     return {
       symbol: stock.symbol,
       name: stock.name,
@@ -116,7 +140,7 @@ function generateSimulatedStocks(): Stock[] {
       price: Number((basePrice + change).toFixed(2)),
       change: Number(change.toFixed(2)),
       changePercent: Number(changePercent.toFixed(2)),
-      volume: Math.floor(Math.random() * 50000000) + 1000000
+      volume: Math.floor(Math.random() * 50000000) + 1000000,
     };
   });
 }
@@ -129,7 +153,7 @@ function getBasePrice(symbol: string): number {
     'MA': 458.30, 'HD': 345.20, 'DIS': 112.50, 'BAC': 35.80,
     'XOM': 105.40, 'PFE': 28.90, 'KO': 62.30, 'NFLX': 485.60,
     'INTC': 42.50, 'AMD': 165.80, 'CRM': 265.40, 'ORCL': 125.60,
-    'ADBE': 545.20
+    'ADBE': 545.20,
   };
   return prices[symbol] || 100;
 }
